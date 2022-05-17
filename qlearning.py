@@ -68,12 +68,21 @@ def update_player(q_table,current_state,next_state,A,alpha,reward,gamma):
     
     current_state_hash = get_hash(current_state)
     
-    #----- Update q_table
-    array_of_q_values = q_table[current_state_hash]
-    q_value = array_of_q_values[:,A]
-    updated_q_value = q_value + alpha*(reward + gamma*get_max_Q(q_table,next_state) - q_value)
-    array_of_q_values[:,A] = updated_q_value # update Q(S,A)
-    q_table[current_state_hash] = array_of_q_values # store updated Q(S,A)
+    if next_state is not None :
+        #----- Update q_table
+        array_of_q_values = q_table[current_state_hash]
+        q_value = array_of_q_values[:,A]
+        updated_q_value = q_value + alpha*(reward + gamma*get_max_Q(q_table,next_state) - q_value)
+        array_of_q_values[:,A] = updated_q_value # update Q(S,A)
+        q_table[current_state_hash] = array_of_q_values # store updated Q(S,A)
+    
+    else:
+        #----- Update q_table
+        array_of_q_values = q_table[current_state_hash]
+        q_value = array_of_q_values[:,A]
+        updated_q_value = q_value + alpha*(reward + gamma*0.0 - q_value)
+        array_of_q_values[:,A] = updated_q_value # update Q(S,A)
+        q_table[current_state_hash] = array_of_q_values # store updated Q(S,A)
     
     return q_table
 
@@ -89,8 +98,8 @@ class agent:
         availables_positions = get_available_positions(grid)
         
         #-- for states in the q_table
-        if grid_hash in q_table.keys():
-            A = get_best_action(availables_positions,q_table[grid_hash])
+        if grid_hash in self.q_table.keys():
+            A = get_best_action(availables_positions,self.q_table[grid_hash])
         
         #-- For any other state not discovered, any available action can be taken
         else :
@@ -157,7 +166,7 @@ def test_policy(eps_optimalplayer,q_table,verbose=False):
         if eps_optimalplayer < 1:
             string = "M_opt"    
         print(string+" : ",M)
-        print(wins_count)
+        print(wins_count,'\n')
 
     
     return M
@@ -183,15 +192,14 @@ def q_learning(epsilon,num_episodes:int,env:TictactoeEnv,path_save:str,eps_opt=0
     for episode in range(1,num_episodes+1):
         
         if episode % 250 == 0 :
-            if episode % 1000 == 0 :
-                print(f"\nEpisode : {episode}")
-                print(wins_count)
             agent_mean_rewards[int(episode//250)-1] = accumulate_reward/250
             accumulate_reward = 0 # reset
-            
+            if episode % 5000 == 0 :
+                print(f"\nEpisode : {episode}")
+                print(wins_count)
             if test:
-                M_opt = test_policy(0,q_table,verbose=True)
-                M_rand = test_policy(1,q_table,verbose=True)
+                M_opt = test_policy(0,q_table,verbose=False)
+                M_rand = test_policy(1,q_table,verbose=False)
                 M_opts.append(M_opt)
                 M_rands.append(M_rand)
                 
@@ -232,14 +240,6 @@ def q_learning(epsilon,num_episodes:int,env:TictactoeEnv,path_save:str,eps_opt=0
                     q_table[current_state_hash]=np.zeros((1,9))
                             
                 #----- Choose action A with epsilon greedy
-                #availables_positions = get_available_positions(current_state)
-                #rnd = np.random.uniform(0,1)
-                #if rnd > epsilon(episode) :
-                #    A = get_best_action(availables_positions,q_table[current_state_hash]) # best move among possible moves        
-                #else:
-                #    np.random.shuffle(availables_positions) # shuffle
-                #    A = availables_positions[0] # take first
-                #    A = A.item()
                 A = get_action(epsilon(episode), current_state, current_state_hash,q_table)
                 
                 #----- Take action A & Observe reward
@@ -247,7 +247,7 @@ def q_learning(epsilon,num_episodes:int,env:TictactoeEnv,path_save:str,eps_opt=0
                 reward = env.reward(agent_learner)
                 if reward > 0:  
                     #----- Update q_table when agent wins
-                    q_table = update_player(q_table,current_state,env.observe()[0],A,alpha,reward,gamma)
+                    q_table = update_player(q_table,current_state,None,A,alpha,reward,gamma)
                     
                 #----- Update q_table
                 #q_table = update_player(q_table,current_state,next_state,A,alpha,reward,gamma)
@@ -287,9 +287,9 @@ def q_learning(epsilon,num_episodes:int,env:TictactoeEnv,path_save:str,eps_opt=0
 #-- Q.1
 eps_1=lambda x : 0.1
 path = './20k_eps_01-v2.pickle'
-if True:
+if False:
     env = TictactoeEnv()
-    q_table,wins_count,agent_mean_rewards,M_opts,M_rands = q_learning(epsilon=eps_1,num_episodes=int(20e3),env=env,path_save=path,alpha=0.05,gamma=0.99,render=False,test=False)
+    q_table,wins_count,agent_mean_rewards,M_opts,M_rands = q_learning(epsilon=eps_1,num_episodes=int(20e3),eps_opt=0.5,env=env,path_save=path,alpha=0.05,gamma=0.99,render=False,test=False)
     plt.plot(agent_mean_rewards)
     plt.title(f'Average rewards with Epsilon {eps_1(0)}')
 
@@ -298,22 +298,25 @@ eps_min=0.1
 eps_max=0.8
 
 if False :
-    fig,axs = plt.subplots(1,2)
+    fig,axs = plt.subplots(3,1,figsize=(10,10))
     env = TictactoeEnv()
     test=True
     for N_star in [1,10e3,20e3,30e3,40e3]:
         eps_2=lambda x : max([eps_min,eps_max*(1-x/N_star)])
-        q_table,wins_count,agent_mean_rewards,M_opts,M_rands = q_learning(epsilon=eps_2,num_episodes=int(20e3),env=env,path_save='./20k_decrease.pickle',alpha=0.05,gamma=0.99,render=False,test=test)
+        q_table,wins_count,agent_mean_rewards,M_opts,M_rands = q_learning(epsilon=eps_2,num_episodes=int(20e3),env=env,path_save=f'./20k_decreasing_Nstar{N_star}.pkl',alpha=0.05,gamma=0.99,render=False,test=test)
         axs[0].plot(agent_mean_rewards,label=f'N* {N_star}')
-        if test :
-            axs[1].plot(M_opts,label=f' M_opt N* {N_star}')
-            axs[1].plot(M_rands,label=f' M_rand N* {N_star}')
+        axs[1].plot(M_opts,label=f' M_opt N* {N_star}')
+        axs[2].plot(M_rands,label=f' M_rand N* {N_star}')
 
     #print('\nfinal : ',wins_count)
     axs[0].set_title('Average rewards')
-    axs[1].set_title(r'$M_{opt}$ and $M_{rand}$')
-    plt.legend()
-    
+    axs[1].set_title(r'$M_{opt}$')
+    axs[2].set_title(r'$M_{rand}$')
+    axs[0].legend()
+    axs[1].legend()
+    axs[2].legend()
+
+    plt.tight_layout()
 """
 #-- Plot epsilons profiles
 for N_star in [1,10e3,20e3,30e3,40e3]:
@@ -327,22 +330,31 @@ if False :
     env = TictactoeEnv()
     test=True
     N_star = 10e3 # to update
+    Mopts=list()
+    Mrands=list()
     for eps in [0,0.25,0.5,0.75,1]:
         eps_2=lambda x : max([eps_min,eps_max*(1-x/N_star)])
-        q_table,wins_count,agent_mean_rewards,M_opts,M_rands = q_learning(epsilon=eps_2,eps_opt=eps,num_episodes=int(20e3),env=env,path_save='./20k_Q4.pickle',alpha=0.05,gamma=0.99,render=False,test=test)
+        q_table,wins_count,agent_mean_rewards,M_opts,M_rands = q_learning(epsilon=eps_2,eps_opt=eps,num_episodes=int(20e3),env=env,path_save=None,alpha=0.05,gamma=0.99,render=False,test=test)
         plt.plot(M_opts,label=f'M_opt; eps_opt={eps}')
         plt.plot(M_rands,label=f'M_rand; eps_opt={eps}')
-
+        
+        Mopts.append(M_opts) # for debugging 
+        Mrands.append(M_rands) # for debugging
 #-- Test
-if True :
-    env = TictactoeEnv()
-    q_table = None
-    with open(path,'rb') as file:
-        q_table = pickle.load(file)
-    
-    player = agent(q_table)
-    for eps in [0,1]:
-        test_policy(eps,q_table,verbose=True)
+for i in range(10):
+    print(i,"--"*20)
+if False :
+    for i in range(10):
+        print(i,'--'*20)
+        env = TictactoeEnv()
+        q_table = None
+        with open(path,'rb') as file:
+            q_table = pickle.load(file)
+        
+        print('path : ', path)
+        player = agent(q_table)
+        for eps in [0,1]:
+            test_policy(eps,q_table,verbose=True)
 
 
 
