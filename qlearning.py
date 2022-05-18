@@ -296,18 +296,17 @@ if False:
 #-- Q.2 and Q.3
 eps_min=0.1
 eps_max=0.8
-
-if False :
+if True :
     fig,axs = plt.subplots(3,1,figsize=(10,10))
     env = TictactoeEnv()
     test=True
     for N_star in [1,10e3,20e3,30e3,40e3]:
+        print('--'*20,'>',N_star)
         eps_2=lambda x : max([eps_min,eps_max*(1-x/N_star)])
         q_table,wins_count,agent_mean_rewards,M_opts,M_rands = q_learning(epsilon=eps_2,num_episodes=int(20e3),env=env,path_save=f'./20k_decreasing_Nstar{N_star}.pkl',alpha=0.05,gamma=0.99,render=False,test=test)
         axs[0].plot(agent_mean_rewards,label=f'N* {N_star}')
         axs[1].plot(M_opts,label=f' M_opt N* {N_star}')
         axs[2].plot(M_rands,label=f' M_rand N* {N_star}')
-
     #print('\nfinal : ',wins_count)
     axs[0].set_title('Average rewards')
     axs[1].set_title(r'$M_{opt}$')
@@ -317,6 +316,7 @@ if False :
     axs[2].legend()
 
     plt.tight_layout()
+    
 """
 #-- Plot epsilons profiles
 for N_star in [1,10e3,20e3,30e3,40e3]:
