@@ -27,16 +27,16 @@ def update_policy(policy_net:nn.Module,
     loss = None
     
     if online_update :
-        assert None not in online_state_action_reward,'provide these values.'
+        #assert None not in online_state_action_reward,'provide these values.'
         
         #-- Compute Q values
         state,next_state,action,reward = online_state_action_reward
         state=state.to(memory.device)
-        next_state = next_state.to(memory.device)
         state_action_values = policy_net(state)[:,action] # take Q(state,action)
         
-        next_state_values=0.0
+        next_state_values=torch.tensor([0.0])
         if next_state is not None:
+            next_state = next_state.to(memory.device)
             next_state_values = target_net(next_state).max(1)[0].detach() # take max Q(state',action')
         
         #-- Compute target
@@ -185,7 +185,7 @@ def deep_q_learning(epsilon,num_episodes:int,
                     if reward < 0 : 
                         next_state = None # optimal wins
                     
-                    #-- Update
+                    #-- Update Policy
                     update_policy(policy_net,target_net, memory,
                                       optimizer, gamma=gamma,
                                       online_update=online_update,
@@ -240,7 +240,6 @@ def deep_q_learning(epsilon,num_episodes:int,
                         memory.push(current_state, torch.tensor([A]), next_state, torch.tensor([reward])) # update replay buffer
 
                     num_illegal_actions += 1
-                    
                     wandb.log({'num_illegal_actions':num_illegal_actions})
                     
                     #-- Terminating game
@@ -280,7 +279,7 @@ def deep_q_learning(epsilon,num_episodes:int,
 eps_1=lambda x : 0.3
 if True:
     test=False
-    for do in [True,False]:
+    for do in [False,True]:
         env = TictactoeEnv()
         wins_count,agent_mean_rewards,M_opts,M_rands = deep_q_learning(epsilon=eps_1,num_episodes=int(20e3),
                                                                           eps_opt=0.5,env=env,path_save=None,
@@ -290,7 +289,7 @@ if True:
 #-- Q.13
 eps_min=0.1
 eps_max=0.8
-if False :
+if True :
     env = TictactoeEnv()
     test=True
     for do in [True,False]:
@@ -300,7 +299,7 @@ if False :
             wins_count,agent_mean_rewards,M_opts,M_rands = deep_q_learning(epsilon=eps_2,num_episodes=int(20e3),
                                                                           eps_opt=0.5,env=env,path_save=None,
                                                                           gamma=0.99,render=False,test=test,
-                                                                          wandb_tag="DQN_2ndNet",online_update=do)
+                                                                          wandb_tag="V2",online_update=do)
         
 """
 env = TictactoeEnv()
