@@ -32,7 +32,6 @@ def q_learning(epsilon,num_episodes:int,env:TictactoeEnv,path_save:str,eps_opt=0
     wins_count['agent']=0
     wins_count['draw']=0
     players = dict()
-    players[None] = 'draw'
     M_opts = list()
     M_rands = list()
     accumulate_reward = 0
@@ -43,15 +42,13 @@ def q_learning(epsilon,num_episodes:int,env:TictactoeEnv,path_save:str,eps_opt=0
         if episode % 250 == 0 :
             agent_mean_rewards[int(episode//250)-1] = accumulate_reward/250
             accumulate_reward = 0 # reset
-            if episode % 5000 == 0 :
-                print(f"\nEpisode : {episode}")
-                print(wins_count)
+
             if test:
-                M_opt = test_policy(0,q_table,verbose=False)
-                M_rand = test_policy(1,q_table,verbose=False)
+                M_opt = test_policy(0,q_table=q_table,verbose=False)
+                M_rand = test_policy(1,q_table=q_table,verbose=False)
                 M_opts.append(M_opt)
                 M_rands.append(M_rand)
-                
+                    
         env.reset()
         turns = turns[np.random.permutation(2)]
         player_opt = OptimalPlayer(epsilon=eps_opt,player=turns[0])
@@ -64,7 +61,7 @@ def q_learning(epsilon,num_episodes:int,env:TictactoeEnv,path_save:str,eps_opt=0
         next_state = None
         A = None
         
-        for j in range(9) : # The game takes at most 9 steps to finish
+        while not env.end : # The game takes at most 9 steps to finish
 
             #-- Optimal player plays 
             if env.current_player == turns[0]  :
@@ -99,33 +96,27 @@ def q_learning(epsilon,num_episodes:int,env:TictactoeEnv,path_save:str,eps_opt=0
                     #----- Update q_table when agent wins
                     q_table = update_player(q_table,current_state,None,A,alpha,reward,gamma)
                     
-                #----- Update q_table
-                #q_table = update_player(q_table,current_state,next_state,A,alpha,reward,gamma)
 
             #-- Chek that the game hasn't finished
             if env.end :
-                if env.winner is not None :
+                if env.winner is None :
+                    wins_count['draw'] = wins_count['draw'] + 1   
+                else :
                     winner = players[env.winner]
                     wins_count[winner] = wins_count[winner] + 1
-                else :
-                    wins_count['draw'] = wins_count['draw'] + 1
 
                 if render : 
                     print(f"Episode {episode} ; Winner is {winner}.")
                     env.render()
-                    
-                #-- Updating Q-value when agent looses
-                #if env.reward(agent_learner) == -1:  
-                    #----- Update q_table
-                    #q_table = update_player(q_table,current_state,env.observe()[0],A,alpha,-1,gamma)
-                    
+
                 #-- accumulate rewards
                 accumulate_reward += env.reward(agent_learner)
                     
-                break
             
-        #print(episode,env.winner)
-        
+        if episode % 1000 == 0 :
+            print(f"\nEpisode : {episode}")
+            print(wins_count)
+            
     #--save
     if path_save is not None:
         with open(path_save,'wb') as file:
@@ -137,7 +128,7 @@ def q_learning(epsilon,num_episodes:int,env:TictactoeEnv,path_save:str,eps_opt=0
 #-- Q.1
 eps_1=lambda x : 0.1
 path = './20k_eps_01-v2.pickle'
-if False:
+if True:
     env = TictactoeEnv()
     q_table,wins_count,agent_mean_rewards,M_opts,M_rands = q_learning(epsilon=eps_1,num_episodes=int(20e3),eps_opt=0.5,env=env,path_save=path,alpha=0.05,gamma=0.99,render=False,test=False)
     plt.plot(agent_mean_rewards)
@@ -146,7 +137,7 @@ if False:
 #-- Q.2 and Q.3
 eps_min=0.1
 eps_max=0.8
-if True :
+if False :
     fig,axs = plt.subplots(3,1,figsize=(10,10))
     env = TictactoeEnv()
     test=True

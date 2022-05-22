@@ -1,5 +1,11 @@
 import numpy as np
 from tic_env import TictactoeEnv, OptimalPlayer
+import torch
+import torch.nn as nn
+from collections import namedtuple, deque
+import random
+
+
 
 def play_game(p1,p2):
     env=TictactoeEnv()
@@ -116,7 +122,6 @@ def update_player(q_table,current_state,next_state,A,alpha,reward,gamma):
     
     return q_table
 
-
 class agent:
     
     def __init__(self,q_table):
@@ -137,11 +142,79 @@ class agent:
             A = availables_positions[0].item()
             
         return A
+    
+####################################################################### 
+class DQN(nn.Module):
+    def __init__(self):
+        super(DQN,self).__init__()
 
-def test_policy(eps_optimalplayer,q_table,verbose=False):
+        self.fc=nn.Sequential(nn.Linear(3*3*2,128),nn.ReLU(),
+                              nn.Linear(128,128),nn.ReLU(),
+                              nn.Linear(128,128),nn.ReLU(),
+                              nn.Linear(128,9))
+    
+    def forward(self,x):
+        x=x.view(-1,18)#x.sum(2).view(-1,9)
+        x=self.fc(x)
+        return x
+
+class ReplayMemory(object):
+
+    def __init__(self, capacity,batch_size):
+        self.memory = deque([],maxlen=capacity)
+        self.Transition = namedtuple('Transition',('state', 'action', 'next_state', 'reward'))
+        self.device='cpu'
+        self.batch_size=batch_size
+        self.step = 0
+        self.accumulated_loss = 0
+    def push(self, *args):
+        """Save a transition"""
+        self.memory.append(self.Transition(*args))
+
+    def sample(self):
+        return random.sample(self.memory, self.batch_size)
+
+    def __len__(self):
+        return len(self.memory)
+
+class deep_Q_player:
+    def __init__(self):
+        self.player=''
+    
+    def act(self,state,model:nn.Module,epsilon:float):
+        
+        with torch.no_grad():
+            action_scores = model(state)
+        
+        action = action_scores.argmax().item()
+        if np.random.random() < epsilon:
+            action = np.random.choice(range(9)).item()
+        
+        return action
+
+def grid2tensor(grid:np.array,player:str):
+    
+    state=np.zeros((3,3,2))
+    a = 2*(player=='X')-1 #  1 if player='X' and -1 otherwise
+    
+    grid1 = np.where(grid==a,1,0)
+    grid2 = np.where(grid==-a,1,0)
+    
+    state[:,:,0]=grid1
+    state[:,:,1]=grid2
+    
+    return torch.tensor(state).float()
+
+def test_policy(eps_optimalplayer,q_table=None,verbose=False,DQN_policy_net=None):
     
     env = TictactoeEnv() # environment
-    agent_player = agent(q_table) # agent
+    
+    if DQN_policy_net is None:
+        assert q_table is not None, "Provide q_table"
+        agent_player = agent(q_table) # agent    
+        
+    else:
+        agent_player=deep_Q_player()
     
     #-- Holders 
     wins_count = dict()
@@ -151,6 +224,9 @@ def test_policy(eps_optimalplayer,q_table,verbose=False):
     players = dict()
     players[None] = 'draw'
     turns = np.array(['X','O'])
+    agent_symbol = None # 'X' or 'O'
+    optimal_symbol = None
+    num_illegal_steps = 0
     
     for episode in range(500):
         
@@ -161,11 +237,16 @@ def test_policy(eps_optimalplayer,q_table,verbose=False):
             player_opt = OptimalPlayer(epsilon=eps_optimalplayer,player=turns[1])
             players[turns[0]]=(player_opt,'optimal_player')
             players[turns[1]]=(agent_player,'agent')
+            agent_symbol = turns[1]
+            optimal_symbol = turns[0]
+            
         else:
             player_opt = OptimalPlayer(epsilon=eps_optimalplayer,player=turns[0])
             players[turns[0]]=(agent_player,'agent')
             players[turns[1]]=(player_opt,'optimal_player')
-        
+            agent_symbol = turns[0]
+            optimal_symbol = turns[1]
+            
         for j in range(9):    
             
             #-- Get turn
@@ -176,8 +257,24 @@ def test_policy(eps_optimalplayer,q_table,verbose=False):
             
             #-- Play
             current_player, _ = players[turn]
-            move = current_player.act(grid) 
-            env.step(move,print_grid=False)
+            
+            #-- Playing with DQN-agent
+            if q_table is None and turn==agent_symbol:
+                state = grid2tensor(grid,agent_symbol)
+                move = current_player.act(state,DQN_policy_net,0)
+                
+                try:
+                    env.step(move,print_grid=False)
+                    
+                except ValueError:
+                    env.end = True
+                    env.winner = optimal_symbol
+                    num_illegal_steps += 1
+
+                
+            else:
+                move = current_player.act(grid)  
+                env.step(move,print_grid=False)
         
             #-- Chek that the game has finished
             if env.end :
@@ -197,6 +294,7 @@ def test_policy(eps_optimalplayer,q_table,verbose=False):
             string = "M_opt"    
         print(string+" : ",M)
         print(wins_count,'\n')
+        print('Number of illegal steps',num_illegal_steps)
 
     
     return M
