@@ -13,6 +13,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 import wandb
+from typing import Sequence
 
 
 def update_policy(policy_net:nn.Module,
@@ -118,7 +119,7 @@ def deep_q_learning(epsilon,num_episodes:int,
     target_net.to(memory.device)
     
     #-- wandb init
-    wandb.init(tags=wandb_tag,
+    wandb.init(tags=[wandb_tag],
                project='ANN', 
                entity='fadelmamar', 
                name=str('DQN_learnFromXpert-'+wandb_tag), 
