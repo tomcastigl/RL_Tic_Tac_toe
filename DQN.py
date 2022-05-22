@@ -21,7 +21,6 @@ def update_policy(policy_net:nn.Module,
                   optimizer:optim,
                   criterion=F.huber_loss,
                   gamma=0.99,
-                  terminal_state=False,terminal_state_action_reward=(None,None,None),
                   online_update=False,online_state_action_reward=(None,None,None,None)):
     
     memory.step += 1
@@ -35,7 +34,10 @@ def update_policy(policy_net:nn.Module,
         state=state.to(memory.device)
         next_state = next_state.to(memory.device)
         state_action_values = policy_net(state)[:,action] # take Q(state,action)
-        next_state_values = target_net(next_state).max(1)[0].detach() # take max Q(state',action')
+        
+        next_state_values=0.0
+        if next_state is not None:
+            next_state_values = target_net(next_state).max(1)[0].detach() # take max Q(state',action')
         
         #-- Compute target
         target = reward + gamma*next_state_values # no terminal state
@@ -49,30 +51,6 @@ def update_policy(policy_net:nn.Module,
         #-- Log
         wandb.log({'loss':loss.item(),'reward':reward,'Step':memory.step})
 
-    
-    elif terminal_state :
-        assert None not in terminal_state_action_reward,'provide these values.'
-        
-        #-- Compute Q values
-        state,action,reward = terminal_state_action_reward
-        state=state.to(memory.device)
-        state_action_values = policy_net(state)[0,action] # take Q(state,action)
-        
-        #-- Compute target
-        target = torch.tensor(reward + gamma*0.0,device=memory.device) # no terminal state
-        
-        #-- Update gradients
-        #criterion = nn.SmoothL1Loss()
-
-        loss = criterion(state_action_values,target,reduction='mean')
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step
-        
-        #-- Log
-        wandb.log({'loss':loss.item(),'reward':reward,'Step':memory.step})
-        
-       
     else:
         if len(memory) < memory.batch_size:
             return
@@ -83,7 +61,8 @@ def update_policy(policy_net:nn.Module,
         #-- GetTransition of batch-arrays
         batch = memory.Transition(*zip(*transitions))
         
-        non_final_next_states = torch.cat([s for s in batch.next_state]) # if s is not None])
+        non_final_mask = torch.tensor(tuple(map(lambda s: s is not None, batch.next_state)), device=memory.device, dtype=torch.bool)
+        non_final_next_states = torch.cat([s for s in batch.next_state if s is not None])
         
         state_batch = torch.cat(batch.state).to(memory.device)
         action_batch = torch.cat(batch.action).to(memory.device)
@@ -93,8 +72,8 @@ def update_policy(policy_net:nn.Module,
         state_action_values = policy_net(state_batch).gather(1, action_batch.unsqueeze(1))
         
         #-- Compute target
-    
-        next_state_values = target_net(non_final_next_states).max(1)[0].detach()
+        next_state_values = torch.zeros(memory.batch_size,device=memory.device)
+        next_state_values[non_final_mask] = target_net(non_final_next_states).max(1)[0].detach()
         target = reward_batch + gamma*next_state_values
         
         #-- Update gradients
@@ -200,29 +179,27 @@ def deep_q_learning(epsilon,num_episodes:int,
                 
                 #-- Update agent after optimal player takes a step
                 if current_state is not None :
-                    #next_state = torch.from_numpy(env.observe()[0])
                     next_state = grid2tensor(env.observe()[0],agent_learner)
                     reward = env.reward(agent_learner)
                     
-                    if reward < 0 : # optimal wins
-                        update_policy(policy_net,target_net, memory,
-                                      optimizer,gamma=gamma,
-                                      terminal_state=True,terminal_state_action_reward=(current_state,A,reward))
-                        
-                    else: # no winner yet
-                        update_policy(policy_net,target_net, memory,
+                    if reward < 0 : 
+                        next_state = None # optimal wins
+                    
+                    #-- Update
+                    update_policy(policy_net,target_net, memory,
                                       optimizer, gamma=gamma,
-                                      terminal_state=False,terminal_state_action_reward=(None,None,None),
                                       online_update=online_update,
                                       online_state_action_reward=(current_state,next_state,A,reward))
                     
+                        
                     # push in replay buffer
-                    memory.push(current_state, torch.tensor([A]), next_state, torch.tensor([reward])) 
+                    if not online_update:
+                        memory.push(current_state, torch.tensor([A]), next_state, torch.tensor([reward])) 
 
             #-- agent plays
             else:   
                 
-                current_state = grid2tensor(env.observe()[0],agent_learner) #-- Get state
+                current_state = grid2tensor(env.observe()[0],agent_learner)
                             
                 #----- Choose action A with epsilon greedy
                 A = agent.act(current_state, policy_net,epsilon(episode))  
@@ -236,21 +213,35 @@ def deep_q_learning(epsilon,num_episodes:int,
                     #----- Update when agent wins
                     if env.reward(agent_learner) > 0:  
                         reward = 1
-                        update_policy(policy_net,target_net, memory,
-                                      optimizer, gamma=gamma,
-                                      terminal_state=True,terminal_state_action_reward=(current_state,A,reward))
+                        next_state = None
+                        
+                        if online_update:
+                            update_policy(policy_net,target_net, memory,
+                                          optimizer, gamma=gamma,
+                                          online_update=True,
+                                          online_state_action_reward=(current_state,next_state,A,reward))
+                            
+                        else :
+                            memory.push(current_state, torch.tensor([A]), next_state, torch.tensor([reward])) # update replay buffer
+
                         
                 #----- Update when agent moves illegaly
                 except ValueError :
                     reward = -1.0
-                    update_policy(policy_net,target_net, memory,
-                                  optimizer, gamma=gamma,
-                                  terminal_state=True,terminal_state_action_reward=(current_state,A,reward))
+                    next_state = None
+                    
+                    if online_update:
+                        update_policy(policy_net,target_net, memory,
+                                      optimizer, gamma=gamma,
+                                     online_update=True,
+                                     online_state_action_reward=(current_state,next_state,A,reward))
+                        
+                    else:
+                        memory.push(current_state, torch.tensor([A]), next_state, torch.tensor([reward])) # update replay buffer
 
                     num_illegal_actions += 1
                     
                     wandb.log({'num_illegal_actions':num_illegal_actions})
-                    #break 
                     
                     #-- Terminating game
                     env.end = True
@@ -294,12 +285,12 @@ if True:
         wins_count,agent_mean_rewards,M_opts,M_rands = deep_q_learning(epsilon=eps_1,num_episodes=int(20e3),
                                                                           eps_opt=0.5,env=env,path_save=None,
                                                                           gamma=0.99,render=False,test=test,
-                                                                          wandb_tag="DQN_2ndNet",online_update=do)
+                                                                          wandb_tag="V2",online_update=do)
     
 #-- Q.13
 eps_min=0.1
 eps_max=0.8
-if True :
+if False :
     env = TictactoeEnv()
     test=True
     for do in [True,False]:
