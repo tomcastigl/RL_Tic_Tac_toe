@@ -121,7 +121,7 @@ def deep_q_learning(epsilon,num_episodes:int,
     wandb.init(tags=wandb_tag,
                project='ANN', 
                entity='fadelmamar', 
-               name='DQN_learnFromXpert', 
+               name=str('DQN_learnFromXpert-'+wandb_tag), 
                config=args)
     turns = np.array(['X','O'])
     
