@@ -13,19 +13,19 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 import wandb
-from typing import Sequence
-
+#from typing import Sequence
 
 def update_policy(policy_net:nn.Module,
                   target_net:nn.Module,
                   memory:ReplayMemory,
-                  optimizer:optim,
+                  lr=5e-4,
                   criterion=F.huber_loss,
                   gamma=0.99,
                   online_update=False,online_state_action_reward=(None,None,None,None)):
     
     memory.step += 1
     loss = None
+    optimizer = optim.Adam(policy_net.parameters(),lr=lr)
     
     if online_update :
         #assert None not in online_state_action_reward,'provide these values.'
@@ -81,13 +81,15 @@ def update_policy(policy_net:nn.Module,
         loss = criterion(state_action_values,target.unsqueeze(1),reduction='mean')
         optimizer.zero_grad()
         loss.backward()
-        optimizer.step
+        #for p in policy_net.parameters():
+        #    p.grad.data.clamp_(-1,1)
+        #optimizer.step
         
         #-- Log
         wandb.log({'loss':loss,'mean_batch_reward':reward_batch.float().mean(),'Step':memory.step})
     
     memory.accumulated_loss += loss.item()
-    return loss.item()
+    return None # loss.item()
 
 
 def deep_q_learning(epsilon,num_episodes:int,
@@ -98,33 +100,31 @@ def deep_q_learning(epsilon,num_episodes:int,
     #-- agent
     agent = deep_Q_player()
     
-    #-- Initialize Q network
+    #-- Initialize Q networks
     policy_net = DQN()
-    
-    #-- Initialize target network
     target_net = DQN()
     target_net.load_state_dict(policy_net.state_dict())
+
+    #-- Initialize hyperparameters
     batch_size=64
     gamma=0.99
     lr=5e-4
-    optimizer = optim.Adam(policy_net.parameters(),lr=lr)
+    #optimizer = optim.Adam(policy_net.parameters(),lr=lr)
     memory = ReplayMemory(10000,batch_size)
     args={'gamma':gamma,'batch_size':batch_size,'replay_buffer':int(1e4),'lr':lr,'eps_opt':eps_opt,'online_update':online_update}
     
-    #comouting device
-    #if torch.cuda.is_available():
-       # memory.device.to('cuda:0')
-        
+
     policy_net.to(memory.device)
     target_net.to(memory.device)
     
     #-- wandb init
+    
     wandb.init(tags=[wandb_tag],
                project='ANN', 
                entity='fadelmamar', 
-               name=str('DQN_learnFromXpert-'+wandb_tag), 
+               name='DQN_learnFromXpert-', 
                config=args)
-    turns = np.array(['X','O'])
+    
     
     #-- Holder 
     wins_count = dict()
@@ -137,6 +137,7 @@ def deep_q_learning(epsilon,num_episodes:int,
     accumulate_reward = 0
     agent_mean_rewards = [0]*int(num_episodes//250)
     num_illegal_actions = 0
+    turns = np.array(['X','O'])
     
     for episode in range(1,num_episodes+1):
         
@@ -158,123 +159,117 @@ def deep_q_learning(epsilon,num_episodes:int,
         #-- Upddate target network
         if episode % 500 == 0:
             target_net.load_state_dict(policy_net.state_dict())
+            target_net.eval()
             
         env.reset()
-        turns = turns[np.random.permutation(2)] # alternating 1st player 
+        #-- Permuting player every 2 games
+        if episode % 2 == 0 :
+            turns[0] = 'X'
+            turns[1] = 'O'
+        else:
+            turns[0] = 'O'
+            turns[1] = 'X'
+        
         player_opt = OptimalPlayer(epsilon=eps_opt,player=turns[0])
         agent_learner = turns[1]
-        
         players[turns[0]]='optimal_player'
         players[turns[1]]='agent'
         
+        #--
         current_state = None
         A = None # action
-        
-        while not env.end : 
+        agent_reward = None
+        #next_state = None
 
-            #-- Optimal player plays 
+        while not env.end:
+
+            #-- When optimal player plays 
             if env.current_player == turns[0] :
+                
                 grid,end,_ = env.observe() #-- observe grid
                 move = player_opt.act(grid) #-- get move
                 env.step(move,print_grid=False) # optimal player takes a move
-                
-                #-- Update agent after optimal player takes a step
-                if current_state is not None :
-                    next_state = grid2tensor(env.observe()[0],agent_learner)
-                    reward = env.reward(agent_learner)
+  
+                #-- Update agent Online or Replay buffer
+                if current_state is not None :   
+                    next_state = grid2tensor(env.observe()[0],agent_learner)    
+                    agent_reward = env.reward(agent_learner)
                     
-                    if reward < 0 : 
-                        next_state = None # optimal wins
-                    
-                    #-- Update Policy
-                    update_policy(policy_net,target_net, memory,
-                                      optimizer, gamma=gamma,
-                                      online_update=online_update,
-                                      online_state_action_reward=(current_state,next_state,A,reward))
-                    
-                        
-                    # push in replay buffer
-                    if not online_update:
-                        memory.push(current_state, torch.tensor([A]), next_state, torch.tensor([reward])) 
-
-            #-- agent plays
-            else:   
-                
-                current_state = grid2tensor(env.observe()[0],agent_learner)
-                            
-                #----- Choose action A with epsilon greedy
-                A = agent.act(current_state, policy_net,epsilon(episode))  
-                wandb.log({'action':A})
-
-                #----- Take action A & Observe reward
-                try :
-                    _,_,_ = env.step(A,print_grid=False)
-                    reward = env.reward(agent_learner)
-
-                    #----- Update when agent wins
-                    if env.reward(agent_learner) > 0:  
-                        reward = 1
-                        next_state = None
+                    if not env.end : 
+                        memory.push(current_state, torch.tensor([A]), next_state, torch.tensor([agent_reward]))
                         
                         if online_update:
                             update_policy(policy_net,target_net, memory,
-                                          optimizer, gamma=gamma,
-                                          online_update=True,
-                                          online_state_action_reward=(current_state,next_state,A,reward))
-                            
-                        else :
-                            memory.push(current_state, torch.tensor([A]), next_state, torch.tensor([reward])) # update replay buffer
-
-                        
-                #----- Update when agent moves illegaly
-                except ValueError :
-                    reward = -1.0
-                    next_state = None
+                                  gamma=gamma,lr=lr,
+                                  online_update=True,
+                                  online_state_action_reward=(current_state,next_state,A,agent_reward))
                     
-                    if online_update:
-                        update_policy(policy_net,target_net, memory,
-                                      optimizer, gamma=gamma,
-                                     online_update=True,
-                                     online_state_action_reward=(current_state,next_state,A,reward))
-                        
-                    else:
-                        memory.push(current_state, torch.tensor([A]), next_state, torch.tensor([reward])) # update replay buffer
+            #-- agent plays 
+            if not env.end :
 
+                current_state = grid2tensor(env.observe()[0],agent_learner)                          
+                #----- Choose action A with epsilon greedy
+                A = agent.act(current_state, policy_net,epsilon(episode))  
+                wandb.log({'action':A})
+        
+                #----- Take action A & Observe reward
+                try :
+                    _,_,_ = env.step(A,print_grid=False)
+                                        
+                #----- End game when agent moves illegaly
+                except ValueError :                                
                     num_illegal_actions += 1
                     wandb.log({'num_illegal_actions':num_illegal_actions})
-                    
                     #-- Terminating game
                     env.end = True
                     env.winner = turns[0] # optimal player
-                    
-            #-- Chek that the game hasn't finished
+            
+            #-- Update policy offline if applicable
+            if online_update == False :
+                update_policy(policy_net,target_net, memory,
+                              gamma=gamma,lr=lr,
+                              online_update=False)
+
+            #-- Chek that the game has finished
             if env.end :
+                agent_reward = env.reward(agent_learner)
+                memory.push(current_state, torch.tensor([A]), None, torch.tensor([agent_reward])) #-- Store in Replay buffer
+                
+                if online_update:
+                    update_policy(policy_net,target_net, memory,
+                                  gamma=gamma,lr=lr,
+                                  online_update=True,
+                                  online_state_action_reward=(current_state,None,A,agent_reward))    
+                            
                 if env.winner is not None :
                     winner = players[env.winner]
-                    wins_count[winner] = wins_count[winner] + 1
+                    wins_count[winner] = wins_count[winner] + 1            
                 else :
                     wins_count['draw'] = wins_count['draw'] + 1
-
                 if render : 
                     print(f"Episode {episode} ; Winner is {winner}.")
                     env.render()
-                    
-                #-- accumulate rewards
-                accumulate_reward += env.reward(agent_learner)
-                
+
+                #-- Logging
+                accumulate_reward += agent_reward
                 wandb.log({'accumulated_reward':accumulate_reward,
-                           'reward':reward})
+                           'reward':agent_reward})
                 wandb.log(wins_count)
                 
-                
+                #break # stop for-loop
+        
+        #-- Log results            
         if episode % 1000 == 0 :
             print(f"\nEpisode : {episode}")
             print(wins_count)
                 
     wandb.finish()
-    
-    
+
     return wins_count,agent_mean_rewards,M_opts,M_rands
+
+
+
+
 
 #-- Q.11 & Q.12
 eps_1=lambda x : 0.3
@@ -285,12 +280,12 @@ if True:
         wins_count,agent_mean_rewards,M_opts,M_rands = deep_q_learning(epsilon=eps_1,num_episodes=int(20e3),
                                                                           eps_opt=0.5,env=env,path_save=None,
                                                                           gamma=0.99,render=False,test=test,
-                                                                          wandb_tag="V2",online_update=do)
+                                                                          wandb_tag="V3",online_update=do)
     
 #-- Q.13
 eps_min=0.1
 eps_max=0.8
-if True :
+if False :
     env = TictactoeEnv()
     test=True
     for do in [True,False]:
