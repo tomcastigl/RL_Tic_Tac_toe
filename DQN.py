@@ -238,7 +238,7 @@ def deep_q_learning(epsilon,num_episodes:int,
                 break # stop for-loop
         
         #-- Log results            
-        if episode % 1000 == 0 :
+        if episode % 5000 == 0 :
             print(f"\nEpisode : {episode}")
             print(wins_count)
             
