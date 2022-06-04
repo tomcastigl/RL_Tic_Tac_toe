@@ -20,7 +20,7 @@ from copy import deepcopy
 def update_policy(policy_net:nn.Module,
                   target_net:nn.Module,
                   memory:ReplayMemory,
-                  criterion=F.huber_loss,
+                  criterion=nn.SmoothL1Loss(),# F.huber_loss,
                   gamma=0.99,
                   online_update=False,online_state_action_reward=(None,None,None,None)):
     
@@ -78,7 +78,7 @@ def update_policy(policy_net:nn.Module,
         target = reward_batch + gamma*next_state_values
         
         #-- Update gradients
-        loss = criterion(state_action_values,target.unsqueeze(1),reduction='mean')
+        loss = criterion(state_action_values,target.unsqueeze(1))#,reduction='mean')
         loss.backward()
         #for p in policy_net.parameters():
         #    p.grad.data.clamp_(-1,1)
