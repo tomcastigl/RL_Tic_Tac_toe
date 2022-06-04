@@ -255,9 +255,9 @@ def deep_q_learning(epsilon,num_episodes:int,
 
 #-- Q.11 & Q.12
 eps_1=lambda x : 0.3
-if True:
+if False:
     test=False
-    for do in [True]:
+    for do in [False,True]:
         env = TictactoeEnv()
         wins_count,agent_mean_rewards,M_opts,M_rands = deep_q_learning(epsilon=eps_1,num_episodes=int(20e3),
                                                                           eps_opt=0.5,env=env,path_save=None,
@@ -267,10 +267,10 @@ if True:
 #-- Q.13
 eps_min=0.1
 eps_max=0.8
-if True :
+if False :
     env = TictactoeEnv()
     test=True
-    for do in [True]:
+    for do in [False]:
         for N_star in [1,10e3,20e3,30e3,40e3]:
             print('-'*20,' N_star : ',N_star,'-'*20)
             eps_2=lambda x : max([eps_min,eps_max*(1-x/N_star)])
@@ -278,7 +278,23 @@ if True :
                                                                           eps_opt=0.5,env=env,path_save=None,
                                                                           gamma=0.99,render=False,test=test,
                                                                           wandb_tag=f"V3--{int(N_star)}",online_update=do)
-        
+
+#- Q.14
+eps_min=0.1
+eps_max=0.8
+if True :
+    env = TictactoeEnv()
+    test=True
+    N_star=1 # best N_star from Q.13
+    eps_2=lambda x : max([eps_min,eps_max*(1-x/N_star)])
+    for do in [False]:
+        for eps_opt in [0,0.25,0.5,0.75,1]:
+            print('-'*20,' eps_opt : ',eps_opt,'-'*20)
+            wins_count,agent_mean_rewards,M_opts,M_rands = deep_q_learning(epsilon=eps_2,num_episodes=int(20e3),
+                                                                          eps_opt=eps_opt,env=env,path_save=None,
+                                                                          gamma=0.99,render=False,test=test,
+                                                                          wandb_tag=f"V3--eps_opt:{eps_opt}",online_update=do)
+            
 """
 env = TictactoeEnv()
 env.step(1)
