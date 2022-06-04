@@ -203,16 +203,23 @@ def deep_q_learning(epsilon,num_episodes:int,
                     
                     if not env.end : 
                         memory.push(current_state, torch.tensor([A]), next_state, torch.tensor([agent_reward]))
+                        
+                    if online_update:
+                        update_policy(policy_net,target_net,memory,gamma=gamma,
+                                      online_update=True,online_state_action_reward=(current_state,next_state,A,agent_reward))
 
             #-- Update policy offline if applicable
-            #if online_update == False :
-            success = update_policy(policy_net,target_net, memory,gamma=gamma, online_update=False)
+            if online_update == False :
+                success = update_policy(policy_net,target_net, memory,gamma=gamma, online_update=False)
 
             #-- Chek that the game has finished
             if env.end :
                 agent_reward = env.reward(agent_learner)
                 memory.push(current_state, torch.tensor([A]), None, torch.tensor([agent_reward])) #-- Store in Replay buffer
                 
+                if online_update:
+                    update_policy(policy_net,target_net,memory,gamma=gamma,
+                                  online_update=True,online_state_action_reward=(current_state,None,A,agent_reward))
                 #-- Logging
                 if env.winner is not None :
                     winner = players[env.winner]
@@ -250,21 +257,20 @@ def deep_q_learning(epsilon,num_episodes:int,
 eps_1=lambda x : 0.3
 if True:
     test=False
-    for do in [False,True]:
+    for do in [True]:
         env = TictactoeEnv()
         wins_count,agent_mean_rewards,M_opts,M_rands = deep_q_learning(epsilon=eps_1,num_episodes=int(20e3),
                                                                           eps_opt=0.5,env=env,path_save=None,
                                                                           gamma=0.99,render=False,test=test,
                                                                           wandb_tag="V3",online_update=do)
         
-
 #-- Q.13
 eps_min=0.1
 eps_max=0.8
 if True :
     env = TictactoeEnv()
     test=True
-    for do in [False,True]:
+    for do in [True]:
         for N_star in [1,10e3,20e3,30e3,40e3]:
             print('-'*20,' N_star : ',N_star,'-'*20)
             eps_2=lambda x : max([eps_min,eps_max*(1-x/N_star)])
