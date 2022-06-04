@@ -13,19 +13,17 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 import wandb
+from copy import deepcopy
 #from typing import Sequence
+#import matplotlib.pyplot as plt
 
 def update_policy(policy_net:nn.Module,
                   target_net:nn.Module,
                   memory:ReplayMemory,
-                  lr=5e-4,
                   criterion=F.huber_loss,
                   gamma=0.99,
                   online_update=False,online_state_action_reward=(None,None,None,None)):
     
-    memory.step += 1
-    loss = None
-    optimizer = optim.Adam(policy_net.parameters(),lr=lr)
     
     if online_update :
         #assert None not in online_state_action_reward,'provide these values.'
@@ -41,20 +39,21 @@ def update_policy(policy_net:nn.Module,
             next_state_values = target_net(next_state).max(1)[0].detach() # take max Q(state',action')
         
         #-- Compute target
-        target = reward + gamma*next_state_values # no terminal state
+        target = reward + gamma*next_state_values
         
         #-- Update gradients
+        memory.optimizer.zero_grad()
         loss = criterion(state_action_values,target,reduction='mean')
-        optimizer.zero_grad()
         loss.backward()
-        optimizer.step
-        
+        memory.optimizer.step
+        memory.step += 1
+
         #-- Log
         wandb.log({'loss':loss.item(),'reward':reward,'Step':memory.step})
 
     else:
         if len(memory) < memory.batch_size:
-            return
+            return False
         
         #-- Sample Transitions
         transitions = memory.sample()
@@ -68,8 +67,9 @@ def update_policy(policy_net:nn.Module,
         state_batch = torch.cat(batch.state).to(memory.device)
         action_batch = torch.cat(batch.action).to(memory.device)
         reward_batch = torch.cat(batch.reward).to(memory.device)
-        
+
         #-- Compute Q values
+        memory.optimizer.zero_grad()
         state_action_values = policy_net(state_batch).gather(1, action_batch.unsqueeze(1))
         
         #-- Compute target
@@ -79,17 +79,17 @@ def update_policy(policy_net:nn.Module,
         
         #-- Update gradients
         loss = criterion(state_action_values,target.unsqueeze(1),reduction='mean')
-        optimizer.zero_grad()
         loss.backward()
         #for p in policy_net.parameters():
         #    p.grad.data.clamp_(-1,1)
-        #optimizer.step
-        
+        memory.optimizer.step()
+        memory.step += 1
+
         #-- Log
         wandb.log({'loss':loss,'mean_batch_reward':reward_batch.float().mean(),'Step':memory.step})
     
     memory.accumulated_loss += loss.item()
-    return None # loss.item()
+    return True # loss.item()
 
 
 def deep_q_learning(epsilon,num_episodes:int,
@@ -109,22 +109,15 @@ def deep_q_learning(epsilon,num_episodes:int,
     batch_size=64
     gamma=0.99
     lr=5e-4
-    #optimizer = optim.Adam(policy_net.parameters(),lr=lr)
     memory = ReplayMemory(10000,batch_size)
+    memory.optimizer = optim.Adam(policy_net.parameters(),lr=lr) # optimizer
     args={'gamma':gamma,'batch_size':batch_size,'replay_buffer':int(1e4),'lr':lr,'eps_opt':eps_opt,'online_update':online_update}
-    
-
     policy_net.to(memory.device)
     target_net.to(memory.device)
-    
+
     #-- wandb init
-    
-    wandb.init(tags=[wandb_tag],
-               project='ANN', 
-               entity='fadelmamar', 
-               name='DQN_learnFromXpert-', 
-               config=args)
-    
+    wandb.init(tags=[wandb_tag],project='ANN',entity='fadelmamar', 
+               name='DQN_learnFromXpert', config=args)
     
     #-- Holder 
     wins_count = dict()
@@ -150,16 +143,13 @@ def deep_q_learning(epsilon,num_episodes:int,
             memory.accumulated_loss = 0 # reset
             
             if test:
-                M_opt = test_policy(0,q_table=None,DQN_policy_net=policy_net,verbose=False)
-                M_rand = test_policy(1,q_table=None,DQN_policy_net=policy_net,verbose=False)
+                M_opt,num_illegal_opt = test_policy(0,q_table=None,DQN_policy_net=policy_net,verbose=False)
+                M_rand,num_illegal_rand = test_policy(1,q_table=None,DQN_policy_net=policy_net,verbose=False)
                 M_opts.append(M_opt)
                 M_rands.append(M_rand)
-                wandb.log({'M_opt':M_opt,'M_rand':M_rand})
-            
-        #-- Upddate target network
-        if episode % 500 == 0:
-            target_net.load_state_dict(policy_net.state_dict())
-            target_net.eval()
+                wandb.log({'M_opt':M_opt,'M_rand':M_rand,
+                           'num_illegal_opt':num_illegal_opt,
+                           'num_illegal_rand':num_illegal_rand})
             
         env.reset()
         #-- Permuting player every 2 games
@@ -178,41 +168,17 @@ def deep_q_learning(epsilon,num_episodes:int,
         #--
         current_state = None
         A = None # action
-        agent_reward = None
-        #next_state = None
-
-        while not env.end:
-
-            #-- When optimal player plays 
-            if env.current_player == turns[0] :
-                
-                grid,end,_ = env.observe() #-- observe grid
-                move = player_opt.act(grid) #-- get move
-                env.step(move,print_grid=False) # optimal player takes a move
-  
-                #-- Update agent Online or Replay buffer
-                if current_state is not None :   
-                    next_state = grid2tensor(env.observe()[0],agent_learner)    
-                    agent_reward = env.reward(agent_learner)
-                    
-                    if not env.end : 
-                        memory.push(current_state, torch.tensor([A]), next_state, torch.tensor([agent_reward]))
-                        
-                        if online_update:
-                            update_policy(policy_net,target_net, memory,
-                                  gamma=gamma,lr=lr,
-                                  online_update=True,
-                                  online_state_action_reward=(current_state,next_state,A,agent_reward))
-                    
-            #-- agent plays 
-            if not env.end :
-
-                current_state = grid2tensor(env.observe()[0],agent_learner)                          
-                #----- Choose action A with epsilon greedy
-                A = agent.act(current_state, policy_net,epsilon(episode))  
-                wandb.log({'action':A})
         
-                #----- Take action A & Observe reward
+        for j in range(9):
+  
+            #-- Agent plays 
+            if env.current_player == turns[1] :
+                
+                current_state = grid2tensor(env.observe()[0],agent_learner)                          
+                A = agent.act(current_state, policy_net,epsilon(episode))  #----- Choose action A with epsilon greedy
+                wandb.log({'action':A})  
+                
+                #----- Take action A
                 try :
                     _,_,_ = env.step(A,print_grid=False)
                                         
@@ -220,54 +186,63 @@ def deep_q_learning(epsilon,num_episodes:int,
                 except ValueError :                                
                     num_illegal_actions += 1
                     wandb.log({'num_illegal_actions':num_illegal_actions})
-                    #-- Terminating game
-                    env.end = True
+                    env.end = True #-- Terminating game
                     env.winner = turns[0] # optimal player
-            
+                    
+            #-- Optimal player plays 
+            if not env.end :
+                
+                grid,end,_ = env.observe() #-- observe grid
+                move = player_opt.act(grid) #-- get move
+                env.step(move,print_grid=False) # optimal player takes a move
+  
+                #-- Update agent and Replay buffer
+                if current_state is not None :   
+                    next_state = grid2tensor(env.observe()[0],agent_learner)    
+                    agent_reward = env.reward(agent_learner)
+                    
+                    if not env.end : 
+                        memory.push(current_state, torch.tensor([A]), next_state, torch.tensor([agent_reward]))
+
             #-- Update policy offline if applicable
-            if online_update == False :
-                update_policy(policy_net,target_net, memory,
-                              gamma=gamma,lr=lr,
-                              online_update=False)
+            #if online_update == False :
+            success = update_policy(policy_net,target_net, memory,gamma=gamma, online_update=False)
 
             #-- Chek that the game has finished
             if env.end :
                 agent_reward = env.reward(agent_learner)
                 memory.push(current_state, torch.tensor([A]), None, torch.tensor([agent_reward])) #-- Store in Replay buffer
                 
-                if online_update:
-                    update_policy(policy_net,target_net, memory,
-                                  gamma=gamma,lr=lr,
-                                  online_update=True,
-                                  online_state_action_reward=(current_state,None,A,agent_reward))    
-                            
+                #-- Logging
                 if env.winner is not None :
                     winner = players[env.winner]
                     wins_count[winner] = wins_count[winner] + 1            
                 else :
-                    wins_count['draw'] = wins_count['draw'] + 1
-                if render : 
-                    print(f"Episode {episode} ; Winner is {winner}.")
-                    env.render()
-
-                #-- Logging
+                    wins_count['draw'] = wins_count['draw'] + 1  
                 accumulate_reward += agent_reward
                 wandb.log({'accumulated_reward':accumulate_reward,
                            'reward':agent_reward})
                 wandb.log(wins_count)
-                
-                #break # stop for-loop
+                #-- Render
+                if render : 
+                    print(f"Episode {episode} ; Winner is {winner}.")
+                    env.render()
+                    
+                break # stop for-loop
         
         #-- Log results            
         if episode % 1000 == 0 :
             print(f"\nEpisode : {episode}")
             print(wins_count)
-                
+            
+        #-- Upddate target network
+        if episode % 500 == 0:
+            target_net.load_state_dict(deepcopy(policy_net.state_dict()))
+            target_net.eval()
+    
     wandb.finish()
 
     return wins_count,agent_mean_rewards,M_opts,M_rands
-
-
 
 
 
@@ -281,21 +256,22 @@ if True:
                                                                           eps_opt=0.5,env=env,path_save=None,
                                                                           gamma=0.99,render=False,test=test,
                                                                           wandb_tag="V3",online_update=do)
-    
+        
+
 #-- Q.13
 eps_min=0.1
 eps_max=0.8
-if False :
+if True :
     env = TictactoeEnv()
     test=True
-    for do in [True,False]:
+    for do in [False,True]:
         for N_star in [1,10e3,20e3,30e3,40e3]:
-            print('--'*20,' N_star : ',N_star)
+            print('-'*20,' N_star : ',N_star,'-'*20)
             eps_2=lambda x : max([eps_min,eps_max*(1-x/N_star)])
             wins_count,agent_mean_rewards,M_opts,M_rands = deep_q_learning(epsilon=eps_2,num_episodes=int(20e3),
                                                                           eps_opt=0.5,env=env,path_save=None,
                                                                           gamma=0.99,render=False,test=test,
-                                                                          wandb_tag="V2",online_update=do)
+                                                                          wandb_tag=f"V3--{int(N_star)}",online_update=do)
         
 """
 env = TictactoeEnv()

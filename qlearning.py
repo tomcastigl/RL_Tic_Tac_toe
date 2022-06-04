@@ -9,17 +9,7 @@ from tic_env import TictactoeEnv,OptimalPlayer
 import pickle
 import matplotlib.pyplot as plt
 from utils import agent,test_policy,update_player,get_hash,get_action
-import math
-import random
-import matplotlib
-from collections import namedtuple, deque
-from itertools import count
 
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
-import torchvision.transforms as T
 
 def q_learning(epsilon,num_episodes:int,env:TictactoeEnv,path_save:str,eps_opt=0.5,alpha=0.05,gamma=0.99,render=False,test=False):
     
@@ -50,7 +40,15 @@ def q_learning(epsilon,num_episodes:int,env:TictactoeEnv,path_save:str,eps_opt=0
                 M_rands.append(M_rand)
                     
         env.reset()
-        turns = turns[np.random.permutation(2)]
+        #turns = turns[np.random.permutation(2)] # alternating 1st player 
+        #-- Permuting player every 2 games
+        if episode % 2 == 0:
+            turns[0] = 'X'
+            turns[1] = 'O'
+        else:
+            turns[0] = 'O'
+            turns[1] = 'X'
+        
         player_opt = OptimalPlayer(epsilon=eps_opt,player=turns[0])
         agent_learner = turns[1]
         

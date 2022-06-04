@@ -143,7 +143,7 @@ class agent:
             
         return A
     
-####################################################################### 
+####################################################################### DQN #####################################################
 class DQN(nn.Module):
     def __init__(self):
         super(DQN,self).__init__()
@@ -154,7 +154,7 @@ class DQN(nn.Module):
                               nn.Linear(128,9))
     
     def forward(self,x):
-        x=x.view(-1,18)#x.sum(2).view(-1,9)
+        #x=x.view(-1,18)#x.sum(2).view(-1,9)
         x=self.fc(x)
         return x
 
@@ -167,6 +167,8 @@ class ReplayMemory(object):
         self.batch_size=batch_size
         self.step = 0
         self.accumulated_loss = 0
+        self.optimizer = None
+        
     def push(self, *args):
         """Save a transition"""
         self.memory.append(self.Transition(*args))
@@ -180,13 +182,14 @@ class ReplayMemory(object):
 class deep_Q_player:
     def __init__(self):
         self.player=''
-    
+        
     def act(self,state,model:nn.Module,epsilon:float):
         
         with torch.no_grad():
             action_scores = model(state)
         
-        action = action_scores.argmax().item()
+        action = action_scores.max(1)[1].item()
+        
         if np.random.random() < epsilon:
             action = np.random.choice(range(9)).item()
         
@@ -202,8 +205,11 @@ def grid2tensor(grid:np.array,player:str):
     
     state[:,:,0]=grid1
     state[:,:,1]=grid2
+    state = torch.tensor(state)
     
-    return torch.tensor(state).float()
+    flatten_arrays = (state[:,:,0].flatten(),state[:,:,1].flatten())
+    
+    return torch.cat(flatten_arrays).view(-1,18).float()
 
 def test_policy(eps_optimalplayer,q_table=None,verbose=False,DQN_policy_net=None):
     
@@ -234,19 +240,17 @@ def test_policy(eps_optimalplayer,q_table=None,verbose=False,DQN_policy_net=None
         np.random.seed(episode) 
         
         if episode < 250 :
-            player_opt = OptimalPlayer(epsilon=eps_optimalplayer,player=turns[1])
-            players[turns[0]]=(player_opt,'optimal_player')
-            players[turns[1]]=(agent_player,'agent')
-            agent_symbol = turns[1]
-            optimal_symbol = turns[0]
-            
-        else:
-            player_opt = OptimalPlayer(epsilon=eps_optimalplayer,player=turns[0])
-            players[turns[0]]=(agent_player,'agent')
-            players[turns[1]]=(player_opt,'optimal_player')
             agent_symbol = turns[0]
             optimal_symbol = turns[1]
             
+        else:
+            agent_symbol = turns[1]
+            optimal_symbol = turns[0]
+        
+        player_opt = OptimalPlayer(epsilon=eps_optimalplayer,player=optimal_symbol)
+        players[optimal_symbol]=(player_opt,'optimal_player')
+        players[agent_symbol]=(agent_player,'agent')
+        
         for j in range(9):    
             
             #-- Get turn
@@ -259,7 +263,7 @@ def test_policy(eps_optimalplayer,q_table=None,verbose=False,DQN_policy_net=None
             current_player, _ = players[turn]
             
             #-- Playing with DQN-agent
-            if q_table is None and turn==agent_symbol:
+            if DQN_policy_net is not None and turn==agent_symbol:
                 state = grid2tensor(grid,agent_symbol)
                 move = current_player.act(state,DQN_policy_net,0)
                 
@@ -270,8 +274,7 @@ def test_policy(eps_optimalplayer,q_table=None,verbose=False,DQN_policy_net=None
                     env.end = True
                     env.winner = optimal_symbol
                     num_illegal_steps += 1
-
-                
+   
             else:
                 move = current_player.act(grid)  
                 env.step(move,print_grid=False)
@@ -297,6 +300,6 @@ def test_policy(eps_optimalplayer,q_table=None,verbose=False,DQN_policy_net=None
         print('Number of illegal steps',num_illegal_steps)
 
     
-    return M
+    return M,num_illegal_steps
 
 
