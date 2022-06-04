@@ -43,7 +43,7 @@ def update_policy(policy_net:nn.Module,
         
         #-- Update gradients
         memory.optimizer.zero_grad()
-        loss = criterion(state_action_values,target,reduction='mean')
+        loss = criterion(state_action_values,target)
         loss.backward()
         memory.optimizer.step
         memory.step += 1
