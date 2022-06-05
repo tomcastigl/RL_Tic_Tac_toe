@@ -44,12 +44,10 @@ def Metric(policy,optimal=False):
 
     return (N_wins - N_losses)/N
 
-
-############################ Learning from experts
+############################ Q-Learning from experts
 def get_hash(state:np.array)->str:
     
     return str(state.flatten(order='C'))
-
 
 def get_available_positions(state:np.array):
       
@@ -73,11 +71,11 @@ def get_best_action(availables_positions:np.array,array_of_q_values:np.array):
                 A = i
         return A.item()
 
-def get_action(epsilon,current_state,current_state_hash,q_table):
+def get_action(epsilon,current_state,q_table):
     
     availables_positions = get_available_positions(current_state)
     rnd = np.random.uniform(0,1)
-                
+    current_state_hash = get_hash(current_state)
     if rnd > epsilon :
         A = get_best_action(availables_positions,q_table[current_state_hash]) # best move among possible moves        
     else:
@@ -87,19 +85,16 @@ def get_action(epsilon,current_state,current_state_hash,q_table):
     
     return A
     
-
 def get_max_Q(q_table:dict,state:np.array):
         
     hash_ = get_hash(state)
-    max_q = 0.
+    max_q = 0.0
     
     if hash_ in q_table.keys():
         max_q = np.max(q_table[hash_],axis=1)
         
     return max_q
     
-#---------------------------------------------------
-#################################################################################
 def update_player(q_table,current_state,next_state,A,alpha,reward,gamma):
     
     current_state_hash = get_hash(current_state)
