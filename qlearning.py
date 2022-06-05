@@ -119,8 +119,6 @@ def q_learning(epsilon,num_episodes:int,env:TictactoeEnv,path_save:str,eps_opt=0
         with open(path_save,'wb') as file:
             pickle.dump(q_table, file)
     
-    columns = ['Mopts','Mrands','Average rewards']
-    table = wandb.Table(data=[M_opts,M_rands,agent_mean_rewards], columns=columns)
     wandb.log({'table':table})
     wandb.finish()
     
