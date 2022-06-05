@@ -38,8 +38,8 @@ def q_learning(epsilon,num_episodes:int,env:TictactoeEnv,path_save:str,eps_opt=0
             accumulate_reward = 0 # reset
 
             if test:
-                M_opt = test_policy(0,q_table=q_table,verbose=False)
-                M_rand = test_policy(1,q_table=q_table,verbose=False)
+                M_opt,_ = test_policy(0,q_table=q_table,verbose=False)
+                M_rand,_ = test_policy(1,q_table=q_table,verbose=False)
                 M_opts.append(M_opt)
                 M_rands.append(M_rand)
                 wandb.log({'M_opt':M_opt,'M_rand':M_rand})
@@ -119,7 +119,7 @@ def q_learning(epsilon,num_episodes:int,env:TictactoeEnv,path_save:str,eps_opt=0
         with open(path_save,'wb') as file:
             pickle.dump(q_table, file)
             
-    wandb.log({'Mopts':M_opts,'Mrands':M_rands})
+    #wandb.log({'Mopts':M_opts,'Mrands':M_rands})
     wandb.finish()
     
     return q_table,wins_count,agent_mean_rewards,M_opts,M_rands
