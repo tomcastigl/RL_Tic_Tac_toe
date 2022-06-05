@@ -135,7 +135,7 @@ if True:
 #-- Q.2 and Q.3
 eps_min=0.1
 eps_max=0.8
-if False :
+if True :
     env = TictactoeEnv()
     test=True
     for N_star in [1,10e3,20e3,30e3,40e3]:
