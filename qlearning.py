@@ -110,7 +110,7 @@ def q_learning(epsilon,num_episodes:int,env:TictactoeEnv,path_save:str,eps_opt=0
                 break
                     
             
-        if episode % 1000 == 0 :
+        if episode % 5000 == 0 :
             print(f"\nEpisode : {episode}")
             print(wins_count)
             
@@ -118,7 +118,10 @@ def q_learning(epsilon,num_episodes:int,env:TictactoeEnv,path_save:str,eps_opt=0
     if path_save is not None:
         with open(path_save,'wb') as file:
             pickle.dump(q_table, file)
-            
+    
+    columns = ['Mopts','Mrands','Average rewards']
+    table = wandb.Table(data=[M_opts,M_rands,agent_mean_rewards], columns=columns)
+    wandb.log({'table':table})
     wandb.finish()
     
     return q_table,wins_count,agent_mean_rewards,M_opts,M_rands
@@ -126,7 +129,7 @@ def q_learning(epsilon,num_episodes:int,env:TictactoeEnv,path_save:str,eps_opt=0
 
 #-- Q.1
 eps_1=lambda x : 0.3
-if True:
+if False:
     env = TictactoeEnv()
     q_table,wins_count,agent_mean_rewards,M_opts,M_rands = q_learning(epsilon=eps_1,num_episodes=int(20e3),eps_opt=0.5,
                                                                       env=env,path_save=None,alpha=0.05,tag='Q.1',
@@ -146,7 +149,7 @@ if True :
                                                                           path_save=None,alpha=0.05,gamma=0.99,render=False,test=test)
 
 #-- Q.4
-if False :
+if True :
     env = TictactoeEnv()
     test=True
     N_star = 10e3 # to update
