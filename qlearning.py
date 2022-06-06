@@ -127,7 +127,7 @@ def q_learning(epsilon,num_episodes:int,env:TictactoeEnv,path_save:str,eps_opt=0
 
 #-- Q.1
 eps_1=lambda x : 0.3
-if True:
+if False:
     env = TictactoeEnv()
     q_table,wins_count,agent_mean_rewards,M_opts,M_rands = q_learning(epsilon=eps_1,num_episodes=int(20e3),eps_opt=0.5,
                                                                       env=env,path_save=None,alpha=0.05,tag='Q.1',
@@ -136,7 +136,7 @@ if True:
 #-- Q.2 and Q.3
 eps_min=0.1
 eps_max=0.8
-if True :
+if False :
     env = TictactoeEnv()
     test=True
     for N_star in [1,10e3,20e3,30e3,40e3]:
@@ -147,7 +147,7 @@ if True :
                                                                           path_save=None,alpha=0.05,gamma=0.99,render=False,test=test)
 
 #-- Q.4
-if False :
+if True :
     env = TictactoeEnv()
     test=True
     N_star = 10e3 # to update
