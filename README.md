@@ -7,9 +7,9 @@ against an optimal player, since the optimal policy for TTic-Tac-Toe can be expl
 of both Q-learning and DQN:
 <p align="center">
   <img 
-    width="300"
-    height="300"
-    src="[https://picsum.photos/300/300](https://github.com/tomcastigl/RL_Tic_Tac_toe/blob/master/imgs/q13.png)"
+    width="600"
+    height="400"
+    src="https://github.com/tomcastigl/RL_Tic_Tac_toe/blob/master/imgs/q13.png"
   >
 </p>
 ![image](https://github.com/tomcastigl/RL_Tic_Tac_toe/blob/master/imgs/q13.png)
