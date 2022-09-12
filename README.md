@@ -9,7 +9,7 @@ of both Q-learning and DQN:
   <img 
     width="700"
     height="400"
-    src="https://github.com/tomcastigl/RL_Tic_Tac_toe/blob/master/imgs/q13.png"
+    src="https://github.com/tomcastigl/RL_Tic_Tac_toe/blob/master/imgs/q8.png"
   >
 </p>
 <p align="center">
