@@ -22,4 +22,4 @@ for both Q-learning and DQN:
 
 where n* represents the slope of the decreasing exploration rate. for more information, please check the [full project report](https://github.com/tomcastigl/RL_Tic_Tac_toe/blob/master/project_report.pdf).
 
-The best way to test the agent is to play against it. To do this, clone the repo, install the dependencies in the [requirements.txt](https://github.com/tomcastigl/RL_Tic_Tac_toe/blob/master/requirements.txt)file, and run the [interactive_play.py](https://github.com/tomcastigl/RL_Tic_Tac_toe/blob/master/interactive_play.py) script!
+The best way to test the agent is to play against it. To do this, clone the repo, install the dependencies in the [requirements.txt](https://github.com/tomcastigl/RL_Tic_Tac_toe/blob/master/requirements.txt) file, and run the [interactive_play.py](https://github.com/tomcastigl/RL_Tic_Tac_toe/blob/master/interactive_play.py) script!
