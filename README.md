@@ -5,7 +5,13 @@ notebook, where we explored different approaches such as learning from experts a
 We measured the performances of our agents using 2 measures: the fraction of games won against the random player (1->optimal, 0->bad) and the fraction of games won
 against an optimal player, since the optimal policy for TTic-Tac-Toe can be explicity implemented (0->optimal, -1->bad). below are shown the performances during training
 of both Q-learning and DQN:
-
+<p align="center">
+  <img 
+    width="300"
+    height="300"
+    src="[https://picsum.photos/300/300](https://github.com/tomcastigl/RL_Tic_Tac_toe/blob/master/imgs/q13.png)"
+  >
+</p>
 ![image](https://github.com/tomcastigl/RL_Tic_Tac_toe/blob/master/imgs/q13.png)
 ![image](https://github.com/tomcastigl/RL_Tic_Tac_toe/blob/master/imgs/q17.png)
 
