@@ -20,4 +20,6 @@ of both Q-learning and DQN:
   >
 </p>
 
+where n* represent the slope of the decreasing learning rate. for more information, please check the [full project report](https://github.com/tomcastigl/RL_Tic_Tac_toe/blob/master/project_report.pdf)
+
 The best way to test the agent is to play against it by running the "interactive_play.py" script!
