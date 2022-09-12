@@ -6,5 +6,7 @@ We measured the performances of our agents using 2 measures: the fraction of gam
 against an optimal player, since the optimal policy for TTic-Tac-Toe can be explicity implemented (0->optimal, -1->bad). below are shown the performances during training
 of both Q-learning and DQN:
 
+![image](https://github.com/tomcastigl/RL_Tic_Tac_toe/blob/master/imgs/q13.png)
+![image](https://github.com/tomcastigl/RL_Tic_Tac_toe/blob/master/imgs/q17.png)
 
 The best way to test the agent is to play against it by running the "interactive_play.py" script!
