@@ -7,12 +7,17 @@ against an optimal player, since the optimal policy for TTic-Tac-Toe can be expl
 of both Q-learning and DQN:
 <p align="center">
   <img 
-    width="600"
+    width="700"
     height="400"
     src="https://github.com/tomcastigl/RL_Tic_Tac_toe/blob/master/imgs/q13.png"
   >
 </p>
-![image](https://github.com/tomcastigl/RL_Tic_Tac_toe/blob/master/imgs/q13.png)
-![image](https://github.com/tomcastigl/RL_Tic_Tac_toe/blob/master/imgs/q17.png)
+<p align="center">
+  <img 
+    width="700"
+    height="400"
+    src="https://github.com/tomcastigl/RL_Tic_Tac_toe/blob/master/imgs/q17.png"
+  >
+</p>
 
 The best way to test the agent is to play against it by running the "interactive_play.py" script!
