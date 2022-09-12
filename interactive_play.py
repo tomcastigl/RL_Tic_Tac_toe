@@ -56,12 +56,12 @@ class deep_Q_player:
         
         return action
 
-start=input('commencer? (oui/non): ')
+start=input('Do you want to pay first? (yes/no): ')
 env=TictactoeEnv()
-if start=='oui':
+if start=='yes':
     player=human_player('X')
     opponent=deep_Q_player('O', epsilon=0)
-if start=='non':
+if start=='no':
     player=human_player('O')
     opponent=deep_Q_player('X', epsilon=0)
 policy=DQN()
@@ -72,7 +72,9 @@ while not env.end:
     
     if i==0: env.render()    
     if env.current_player==player.player:
-        move=int(input('enter your move [1,9]:'))-1
+        move=int(input('enter your move [0,8]:'))
+        while not env.check_valid(move):
+             move=int(input('position occupied. enter your new move [0,8]:'))
         env.step(move)
         env.render()
     elif env.current_player==opponent.player:
@@ -85,7 +87,7 @@ while not env.end:
     
     if env.end:
         if env.winner==opponent.player:
-            print('SUCK IT! \n\n' )
+            print('GOTCHA! \n\n' )
             
         elif env.winner==player.player:
             print('YOU BEAT ME! \n\n')
