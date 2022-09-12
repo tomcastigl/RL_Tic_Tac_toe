@@ -1,5 +1,5 @@
 ## Tabular Q-learning and DQN to master Tic-Tac-Toe
-This project aims to train artificial agents that can play the famous game of Tic Tac Toe. The whole training process can be found in the "training_full_code.ipynb"
+This project aims to train artificial agents that can play the famous game of Tic Tac Toe. The whole training process can be found in the [training_full_code.ipynb](https://github.com/tomcastigl/RL_Tic_Tac_toe/blob/master/training_full_code.ipynb)
 notebook, where we explored different approaches such as learning from experts and self-playing learning for both Q-learning and DQN. 
 
 We measured the performances of our agents using 2 measures: the fraction of games won against the random player (1->optimal, 0->bad) and the fraction of games won
@@ -22,4 +22,4 @@ of both Q-learning and DQN:
 
 where n* represent the slope of the decreasing learning rate. for more information, please check the [full project report](https://github.com/tomcastigl/RL_Tic_Tac_toe/blob/master/project_report.pdf)
 
-The best way to test the agent is to play against it by running the "interactive_play.py" script!
+The best way to test the agent is to play against it by running the [interactive_play.py](https://github.com/tomcastigl/RL_Tic_Tac_toe/blob/master/interactive_play.py) script!
